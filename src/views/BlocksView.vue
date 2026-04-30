@@ -196,7 +196,6 @@ onMounted(async () => {
                 <th>Nombre</th>
                 <th class="hidden sm:table-cell">Proyecto</th>
                 <th class="hidden md:table-cell">Código</th>
-                <th class="hidden lg:table-cell">Piezas</th>
                 <th style="width:160px; min-width:160px;">Acciones</th>
               </tr>
             </thead>
@@ -219,10 +218,6 @@ onMounted(async () => {
                 <td class="hidden md:table-cell">
                   <code v-if="block.codigo" class="code-pill group-hover:scale-105 transition-transform inline-block">{{ block.codigo }}</code>
                   <span v-else class="muted">—</span>
-                </td>
-                <td class="hidden lg:table-cell text-slate-500 text-sm">
-                  <span v-if="block.piezas_count" class="font-semibold text-slate-900">{{ block.piezas_count }} piezas</span>
-                  <span v-else class="text-slate-400">Sin piezas</span>
                 </td>
                 <td>
                   <div class="table-actions opacity-70 group-hover:opacity-100 transition-opacity">
@@ -262,22 +257,11 @@ onMounted(async () => {
       </template>
     </div>
 
-    <!-- Modal -->
-    <div v-if="showForm" class="modal-overlay" @click.self="showForm = false">
-      <div class="modal">
-        <div class="modal-header">
+    <!-- Modal (teleported to body to avoid stacking/context issues) -->
+    <Teleport to="body">
+      <div v-if="showForm" class="modal-backdrop" @click.self="showForm = false">
+        <div class="modal">
           <h2>{{ form.id ? 'Editar bloque' : 'Crear bloque' }}</h2>
-          <button class="close-button" @click="showForm = false">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-
-        <div class="modal-body">
-          <div v-if="errors.general" class="error-banner">
-            {{ errors.general }}
-          </div>
 
           <label class="field">
             <span>Proyecto <span v-if="!form.id" style="color:var(--c-danger)">*</span></span>
@@ -285,29 +269,31 @@ onMounted(async () => {
               <option value="">{{ form.id ? (selectedProject?.nombre || '—') : 'Selecciona un proyecto' }}</option>
               <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.nombre }}</option>
             </select>
-            <span v-if="errors.proyecto_id" class="field-error">{{ errors.proyecto_id }}</span>
+            <small v-if="errors.proyecto_id" class="field-error">{{ errors.proyecto_id }}</small>
           </label>
 
           <label class="field">
             <span>Nombre <span style="color:var(--c-danger)">*</span></span>
             <input v-model="form.nombre" type="text" placeholder="Ej: Bloque A" />
-            <span v-if="errors.nombre" class="field-error">{{ errors.nombre }}</span>
+            <small v-if="errors.nombre" class="field-error">{{ errors.nombre }}</small>
           </label>
 
           <label class="field">
             <span>Código</span>
             <input v-model="form.codigo" type="text" placeholder="Ej: BLK-001" />
-            <span v-if="errors.codigo" class="field-error">{{ errors.codigo }}</span>
+            <small v-if="errors.codigo" class="field-error">{{ errors.codigo }}</small>
           </label>
-        </div>
 
-        <div class="modal-footer">
-          <button class="secondary-button" @click="showForm = false">Cancelar</button>
-          <button class="primary-button" :disabled="submitting" @click="saveBlock">
-            {{ submitting ? 'Guardando...' : form.id ? 'Actualizar' : 'Crear' }}
-          </button>
+          <div v-if="errors.general" class="form-error">{{ errors.general }}</div>
+
+          <div class="modal-actions">
+            <button class="ghost-button" @click="showForm = false">Cancelar</button>
+            <button class="primary-button" :disabled="submitting" @click="saveBlock">
+              {{ submitting ? 'Guardando...' : form.id ? 'Actualizar' : 'Crear' }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Teleport>
   </section>
 </template>

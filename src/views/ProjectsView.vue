@@ -254,9 +254,10 @@ onMounted(() => fetchProjects())
     </div>
 
     <!-- Modal -->
-    <Transition name="modal">
-      <div v-if="showForm" class="modal-backdrop" @click.self="showForm = false">
-        <div class="modal">
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showForm" class="modal-backdrop" @click.self="showForm = false">
+          <div class="modal">
           <h2>{{ form.id ? 'Editar proyecto' : 'Nuevo proyecto' }}</h2>
 
           <label class="field">
@@ -289,8 +290,9 @@ onMounted(() => fetchProjects())
               {{ submitting ? 'Guardando...' : 'Guardar' }}
             </button>
           </div>
+          </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </section>
 </template>

@@ -348,6 +348,7 @@ onMounted(async () => {
     </div>
 
     <!-- Modal -->
+    <Teleport to="body">
     <Transition name="modal">
       <div v-if="showForm" class="modal-backdrop" @click.self="showForm = false">
         <div class="modal relative overflow-hidden">
@@ -467,5 +468,7 @@ onMounted(async () => {
         </div>
       </div>
     </Transition>
+    </Teleport>
+
   </section>
 </template>
