@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useUiStore } from './stores/ui'
 import AppShell from './layouts/AppShell.vue'
+import ConfirmationModal from './components/ConfirmationModal.vue'
 
 const authStore = useAuthStore()
 const uiStore = useUiStore()
@@ -85,4 +86,7 @@ onMounted(() => {
       </button>
     </div>
   </TransitionGroup>
+
+  <!-- Confirmation Modal -->
+  <ConfirmationModal />
 </template>

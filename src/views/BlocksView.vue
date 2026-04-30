@@ -2,8 +2,10 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { piecesApi } from '../api/client'
 import { useUiStore } from '../stores/ui'
+import { useConfirmationModal } from '../stores/confirmationModal'
 
 const uiStore = useUiStore()
+const confirmModal = useConfirmationModal()
 
 const loading = ref(true)
 const blocks = ref([])
@@ -108,15 +110,20 @@ const saveBlock = async () => {
   }
 }
 
-const deleteBlock = async (b) => {
-  if (!confirm(`¿Eliminar el bloque "${b.nombre}"? Se eliminarán también sus piezas.`)) return
-  try {
-    await piecesApi.delete(`/bloques/${b.id}`)
-    uiStore.showToast({ type: 'success', title: 'Bloque eliminado', message: b.nombre })
-    await fetchBlocks(pagination.currentPage)
-  } catch {
-    uiStore.showToast({ type: 'error', title: 'Error al eliminar', message: 'Intenta nuevamente.' })
-  }
+const deleteBlock = (b) => {
+  confirmModal.show({
+    title: 'Eliminar bloque',
+    message: `¿Eliminar el bloque "${b.nombre}"? Se eliminarán también sus piezas.`,
+    onConfirm: async () => {
+      try {
+        await piecesApi.delete(`/bloques/${b.id}`)
+        uiStore.showToast({ type: 'success', title: 'Bloque eliminado', message: b.nombre })
+        await fetchBlocks(pagination.currentPage)
+      } catch {
+        uiStore.showToast({ type: 'error', title: 'Error al eliminar', message: 'Intenta nuevamente.' })
+      }
+    }
+  })
 }
 
 watch(() => filters.proyecto_id, () => fetchBlocks(1))

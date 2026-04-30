@@ -3,9 +3,11 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { piecesApi } from '../api/client'
 import { useUiStore } from '../stores/ui'
+import { useConfirmationModal } from '../stores/confirmationModal'
 
 const route = useRoute()
 const uiStore = useUiStore()
+const confirmModal = useConfirmationModal()
 
 const loading = ref(true)
 const pieces = ref([])
@@ -143,16 +145,21 @@ const savePiece = async () => {
   }
 }
 
-const deletePiece = async (p) => {
+const deletePiece = (p) => {
   const label = p.codigo ? `"${p.codigo}"` : `pieza #${p.id}`
-  if (!confirm(`¿Eliminar la ${label}?`)) return
-  try {
-    await piecesApi.delete(`/piezas/${p.id}`)
-    uiStore.showToast({ type: 'success', title: 'Pieza eliminada', message: p.codigo || `#${p.id}` })
-    await fetchPieces(pagination.currentPage)
-  } catch {
-    uiStore.showToast({ type: 'error', title: 'Error al eliminar', message: 'Intenta nuevamente.' })
-  }
+  confirmModal.show({
+    title: 'Eliminar pieza',
+    message: `¿Eliminar la ${label}?`,
+    onConfirm: async () => {
+      try {
+        await piecesApi.delete(`/piezas/${p.id}`)
+        uiStore.showToast({ type: 'success', title: 'Pieza eliminada', message: p.codigo || `#${p.id}` })
+        await fetchPieces(pagination.currentPage)
+      } catch {
+        uiStore.showToast({ type: 'error', title: 'Error al eliminar', message: 'Intenta nuevamente.' })
+      }
+    }
+  })
 }
 
 const pieceDiff = (p) => {

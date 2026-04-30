@@ -2,8 +2,10 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { piecesApi } from '../api/client'
 import { useUiStore } from '../stores/ui'
+import { useConfirmationModal } from '../stores/confirmationModal'
 
 const uiStore = useUiStore()
+const confirmModal = useConfirmationModal()
 const loading = ref(true)
 const projects = ref([])
 const pagination = reactive({ currentPage: 1, lastPage: 1, total: 0 })
@@ -68,15 +70,20 @@ const saveProject = async () => {
   }
 }
 
-const deleteProject = async (p) => {
-  if (!confirm(`¿Eliminar el proyecto "${p.nombre}"? Se eliminarán también sus bloques y piezas.`)) return
-  try {
-    await piecesApi.delete(`/proyectos/${p.id}`)
-    uiStore.showToast({ type: 'success', title: 'Proyecto eliminado', message: p.nombre })
-    await fetchProjects(pagination.currentPage)
-  } catch {
-    uiStore.showToast({ type: 'error', title: 'Error al eliminar', message: 'Intenta nuevamente.' })
-  }
+const deleteProject = (p) => {
+  confirmModal.show({
+    title: 'Eliminar proyecto',
+    message: `¿Eliminar el proyecto "${p.nombre}"? Se eliminarán también sus bloques y piezas.`,
+    onConfirm: async () => {
+      try {
+        await piecesApi.delete(`/proyectos/${p.id}`)
+        uiStore.showToast({ type: 'success', title: 'Proyecto eliminado', message: p.nombre })
+        await fetchProjects(pagination.currentPage)
+      } catch {
+        uiStore.showToast({ type: 'error', title: 'Error al eliminar', message: 'Intenta nuevamente.' })
+      }
+    }
+  })
 }
 
 onMounted(() => fetchProjects())
@@ -94,7 +101,7 @@ onMounted(() => fetchProjects())
           <h1 class="page-hero-title">Proyectos</h1>
           <p class="page-hero-text">Gestiona proyectos y accede a sus bloques y piezas desde una vista más limpia y consistente.</p>
           <div class="page-hero-chips">
-            <span class="project-chip">{{ pagination.total }} total</span>
+            <!-- <span class="project-chip">{{ pagination.total }} total</span> -->
             <span class="project-chip">Bloques y piezas</span>
             <span class="project-chip">Edición rápida</span>
           </div>
@@ -233,7 +240,7 @@ onMounted(() => fetchProjects())
         </div>
 
         <div class="pagination">
-          <span>{{ pagination.total }} proyecto{{ pagination.total !== 1 ? 's' : '' }}</span>
+          <!-- <span>{{ pagination.total }} proyecto{{ pagination.total !== 1 ? 's' : '' }}</span> -->
           <div style="display:flex;gap:8px;align-items:center;">
             <button class="ghost-button" style="padding:7px 14px;" :disabled="pagination.currentPage <= 1" @click="fetchProjects(pagination.currentPage - 1)">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
