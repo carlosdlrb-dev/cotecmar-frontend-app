@@ -27,13 +27,18 @@
 
 > Nota: Rutas listadas aquí resumen el API esperado por el frontend; el backend puede exponer nombres o versiones diferentes (/api/v1/...).
 
-**Variables de entorno (recomendadas)**
-- `VITE_API_BASE_URL` — URL base del API (ej: https://api.example.com/api/v1)
-- `VITE_APP_TITLE` — Título corto de la app (opcional)
-- `VITE_ENABLE_ANALYTICS` — true/false para telemetría
-- `NODE_ENV` — entorno (development|production)
+**Variables de entorno**
 
-Coloca estas variables en un archivo `.env` o `.env.local` en la raíz del frontend según tus necesidades.
+Copia `.env.example` a `.env` y ajusta los valores:
+
+```bash
+cp .env.example .env
+```
+
+| Variable | Descripción | Valor por defecto |
+|---|---|---|
+| `VITE_AUTH_SERVICE_URL` | URL base del servicio de autenticación | `http://localhost:8000/api` |
+| `VITE_PIECES_API_URL` | URL base del servicio de piezas | `http://localhost:8001/api/v1` |
 
 **Usuario de prueba**
 - Email: `demo@example.com`
@@ -56,10 +61,40 @@ npm run build
 ```bash
 npm run preview
 ```
-5. (Opcional) Con Docker / docker-compose
+5. (Opcional) Con Docker — ver sección **Dockerización** más abajo
+
+**Dockerización**
+
+El proyecto incluye una imagen multi-stage que compila el frontend con Node y lo sirve con Nginx.
+
+*Archivos relevantes*
+- `Dockerfile` — build en `node:20-alpine`, producción en `nginx:stable-alpine`
+- `docker-compose.yml` — levanta el servicio en el puerto `5173`
+- `.dockerignore` — excluye `node_modules`, `dist`, `.env*`, etc.
+- `.env.example` — plantilla de variables de entorno
+
+*Levantar con docker-compose*
 ```bash
-docker-compose up --build
+# Copiar y ajustar variables
+cp .env.example .env
+
+# Construir y levantar
+docker-compose up -d --build 
 ```
+
+La app queda disponible en `http://localhost:5173`.
+
+*Pasar variables en build time (sin docker-compose)*
+```bash
+docker build \
+  --build-arg VITE_AUTH_SERVICE_URL=http://auth.example.com/api \
+  --build-arg VITE_PIECES_API_URL=http://pieces.example.com/api/v1 \
+  -t cotecmar-frontend .
+
+docker run -p 5173:80 cotecmar-frontend
+```
+
+> Las variables `VITE_*` se inyectan en tiempo de build (Vite las incrusta en el bundle); no es necesario pasarlas en tiempo de ejecución del contenedor.
 
 **Decisiones técnicas**
 - Framework: Vue 3 (Composition API) — elegido por su reactividad y composition patterns para componentes complejos.
@@ -71,7 +106,7 @@ docker-compose up --build
 - Rutas: Vue Router con guardas globales que requieren autenticación para rutas privadas y muestran mensajes (toast) antes de redirigir.
 
 **Notas operativas y recomendaciones**
-- Asegúrate de definir `VITE_API_BASE_URL` antes de iniciar para que las llamadas Axios apunten al backend correcto.
+- En desarrollo local (`npm run dev`) define `VITE_AUTH_SERVICE_URL` y `VITE_PIECES_API_URL` en `.env`. Con Docker, los valores por defecto ya están en `docker-compose.yml`; solo necesitas `.env` si quieres sobreescribirlos (ej: apuntar a servidores de producción).
 - Si el CSS se rompe (ej: clases de modal no aplicadas), revisa `src/style.css` y confirma que las clases usadas en los componentes coincidan con las definidas en el archivo de estilos.
 - Para agregar nuevas rutas o vistas sigue la estructura existente en `src/views/` y registra la ruta en `src/router/index.js`.
 
