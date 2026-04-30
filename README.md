@@ -35,6 +35,10 @@
 
 Coloca estas variables en un archivo `.env` o `.env.local` en la raíz del frontend según tus necesidades.
 
+**Usuario de prueba**
+- Email: `demo@example.com`
+- Contraseña: `secret123`
+
 **Pasos de ejecución**
 1. Instalar dependencias
 ```bash
