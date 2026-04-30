@@ -1,0 +1,10 @@
+services:
+  frontend:
+    build:
+      context: .
+      args:
+        VITE_AUTH_SERVICE_URL: ${VITE_AUTH_SERVICE_URL:-http://localhost:8000/api}
+        VITE_PIECES_API_URL: ${VITE_PIECES_API_URL:-http://localhost:8001/api/v1}
+    ports:
+      - "5173:80"
+    restart: unless-stopped
