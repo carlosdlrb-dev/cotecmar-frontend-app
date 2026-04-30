@@ -32,9 +32,9 @@ const fetchProjects = async (page = 1) => {
   try {
     const { data } = await piecesApi.get('/proyectos', { params: { page } })
     projects.value = data.data ?? []
-    pagination.currentPage = data.meta?.current_page ?? 1
-    pagination.lastPage    = data.meta?.last_page ?? 1
-    pagination.total       = data.meta?.total ?? 0
+    pagination.currentPage = data.meta?.current_page ?? data.current_page ?? 1
+    pagination.lastPage    = data.meta?.last_page    ?? data.last_page    ?? 1
+    pagination.total       = data.meta?.total        ?? data.total        ?? 0
   } catch {
     uiStore.showBanner({ type: 'error', title: 'Error al cargar', message: 'No se pudieron obtener los proyectos.' })
   } finally {
