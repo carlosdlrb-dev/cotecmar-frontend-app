@@ -58,17 +58,17 @@ const resetErrors = () => {
 }
 
 const openCreate = () => { resetForm(); resetErrors(); showForm.value = true }
-const openEdit = (p) => {
+const openEdit = async (p) => {
   resetErrors()
   form.id          = p.id
-  form.bloque_id   = p.bloque_id ?? p.bloque?.id ?? ''
   form.codigo      = p.codigo ?? ''
   form.peso_teorico = p.peso_teorico
   form.peso_real    = p.peso_real
   form.estado       = p.estado
   formProjectId.value = p.bloque?.proyecto_id ?? p.proyecto_id ?? ''
   showForm.value = true
-  if (formProjectId.value) fetchFormBlocks(formProjectId.value)
+  if (formProjectId.value) await fetchFormBlocks(formProjectId.value)
+  form.bloque_id = p.bloque_id ?? p.bloque?.id ?? ''
 }
 
 const fetchProjects = async () => {
