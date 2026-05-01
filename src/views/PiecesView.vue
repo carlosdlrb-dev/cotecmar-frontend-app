@@ -16,10 +16,11 @@ const loading = ref(true)
 const pieces = ref([])
 const projects = ref([])
 const formBlocks = ref([])     // blocks for the modal form
+const filterBlocks = ref([])   // blocks for the filter panel
 
 const pagination = reactive({ currentPage: 1, lastPage: 1, total: 0 })
 
-const filters = reactive({ proyecto_id: '', estado: '' })
+const filters = reactive({ proyecto_id: '', estado: '', bloque_id: '' })
 const formProjectId = ref('')   // project selector inside the modal (separate from filter)
 
 const form = reactive({
@@ -48,7 +49,14 @@ const weightDiffClass = computed(() => {
   return d > 0 ? 'text-warning' : d < 0 ? 'text-danger' : 'text-success'
 })
 
-const emptyState = computed(() => !loading.value && pieces.value.length === 0)
+const displayedPieces = computed(() => {
+  if (!filters.bloque_id) return pieces.value
+  return pieces.value.filter(p =>
+    String(p.bloque_id ?? p.bloque?.id) === String(filters.bloque_id)
+  )
+})
+
+const emptyState = computed(() => !loading.value && displayedPieces.value.length === 0)
 
 const resetForm = () => {
   form.id = null; form.bloque_id = ''; form.codigo = ''
@@ -89,6 +97,14 @@ const fetchFormBlocks = async (projectId) => {
   } catch { formBlocks.value = [] }
 }
 
+const fetchFilterBlocks = async (projectId) => {
+  if (!projectId) { filterBlocks.value = []; filters.bloque_id = ''; return }
+  try {
+    const { data } = await piecesApi.get(`/proyectos/${projectId}/bloques`, { params: { per_page: 100 } })
+    filterBlocks.value = data.data ?? []
+  } catch { filterBlocks.value = [] }
+}
+
 const fetchPieces = async (page = 1) => {
   loading.value = true
   try {
@@ -96,7 +112,7 @@ const fetchPieces = async (page = 1) => {
       params: {
         page,
         proyecto_id: filters.proyecto_id || undefined,
-        estado: filters.estado || undefined,
+        estado:      filters.estado      || undefined,
       },
     })
     pieces.value = data.data ?? []
@@ -232,8 +248,9 @@ const diffClass = (p) => {
 }
 
 // Watchers
-watch(() => filters.proyecto_id, () => fetchPieces(1))
-watch(() => filters.estado, () => fetchPieces(1))
+watch(() => filters.proyecto_id, (v) => { filters.bloque_id = ''; fetchFilterBlocks(v); fetchPieces(1) })
+watch(() => filters.estado,      () => fetchPieces(1))
+watch(() => filters.bloque_id,   () => fetchPieces(1))
 watch(formProjectId, (v) => { form.bloque_id = ''; fetchFormBlocks(v) })
 
 onMounted(async () => {
@@ -244,6 +261,7 @@ onMounted(async () => {
   const qBloque   = route.query.bloque_id
   if (qProyecto) {
     filters.proyecto_id = String(qProyecto)
+    await fetchFilterBlocks(qProyecto)
   }
 
   await fetchPieces()
@@ -289,12 +307,19 @@ onMounted(async () => {
 
     <!-- Filters -->
     <div class="panel page-panel px-4 sm:px-5 py-4 sm:py-5">
-      <div class="filters mb-0">
+      <div class="filters mb-0 sm:grid-cols-3">
       <label class="field">
         <span>Proyecto</span>
         <select v-model="filters.proyecto_id">
           <option value="">Todos los proyectos</option>
           <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.nombre }}</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Bloque</span>
+        <select v-model="filters.bloque_id" :disabled="!filters.proyecto_id">
+          <option value="">{{ filters.proyecto_id ? 'Todos los bloques' : 'Elige proyecto primero' }}</option>
+          <option v-for="b in filterBlocks" :key="b.id" :value="b.id">{{ b.nombre }}</option>
         </select>
       </label>
       <label class="field">
@@ -346,7 +371,7 @@ onMounted(async () => {
             </thead>
             <tbody>
               <tr
-                v-for="(piece, index) in pieces"
+                v-for="(piece, index) in displayedPieces"
                 :key="piece.id"
                 class="table-row-enter group"
                 :style="{ animationDelay: (index * 0.05) + 's' }"
