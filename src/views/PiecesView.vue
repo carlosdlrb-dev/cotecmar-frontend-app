@@ -110,23 +110,28 @@ const fetchPieces = async (page = 1) => {
 const savePiece = async () => {
   resetErrors()
   let valid = true
-  if (!form.bloque_id)   { errors.bloque_id = 'Selecciona un bloque.'; valid = false }
-  if (!form.peso_teorico) { errors.peso_teorico = 'Peso teórico obligatorio.'; valid = false }
-  if (!form.peso_real)    { errors.peso_real = 'Peso real obligatorio.'; valid = false }
+  if (!form.bloque_id && !form.id)    { errors.bloque_id = 'Selecciona un bloque.'; valid = false }
+  if (!form.peso_teorico && !form.id) { errors.peso_teorico = 'Peso teórico obligatorio.'; valid = false }
+  if (form.id && form.estado === 'fabricada' && !form.peso_real) {
+    errors.peso_real = 'Peso real obligatorio para marcar como fabricada.'; valid = false
+  }
   if (!valid) return
 
   submitting.value = true
   try {
-    const payload = {
-      codigo: form.codigo || null,
-      peso_teorico: Number(form.peso_teorico),
-      peso_real:    Number(form.peso_real),
-      estado:       form.estado,
-    }
     if (form.id) {
-      await piecesApi.put(`/piezas/${form.id}`, payload)
+      const payload = {
+        codigo:    form.codigo || null,
+        peso_real: form.peso_real !== '' ? Number(form.peso_real) : null,
+        estado:    form.estado,
+      }
+      await piecesApi.patch(`/piezas/${form.id}`, payload)
       uiStore.showToast({ type: 'success', title: 'Pieza actualizada', message: 'Los cambios se guardaron.' })
     } else {
+      const payload = {
+        codigo:       form.codigo || null,
+        peso_teorico: Number(form.peso_teorico),
+      }
       await piecesApi.post(`/bloques/${form.bloque_id}/piezas`, payload)
       uiStore.showToast({ type: 'success', title: 'Pieza creada', message: 'La pieza fue registrada.' })
     }
@@ -163,10 +168,12 @@ const deletePiece = (p) => {
 }
 
 const pieceDiff = (p) => {
+  if (!p.peso_real) return '—'
   const d = Number(p.peso_real) - Number(p.peso_teorico)
   return (d >= 0 ? '+' : '') + d.toFixed(3)
 }
 const diffClass = (p) => {
+  if (!p.peso_real) return 'text-slate-400'
   const d = Number(p.peso_real) - Number(p.peso_teorico)
   return d > 0 ? 'text-warning' : d < 0 ? 'text-danger' : 'text-success'
 }
@@ -302,12 +309,15 @@ onMounted(async () => {
                 <td class="hidden md:table-cell">{{ piece.bloque?.nombre || '—' }}</td>
                 <td class="hidden sm:table-cell font-mono">{{ Number(piece.peso_teorico).toFixed(3) }} kg</td>
                 <td class="font-mono">
-                  {{ Number(piece.peso_real).toFixed(3) }} kg
-                  <span class="sm:hidden text-xs text-slate-400 block">
-                    T: {{ Number(piece.peso_teorico).toFixed(1) }}
-                  </span>
+                  <template v-if="piece.peso_real">
+                    {{ Number(piece.peso_real).toFixed(3) }} kg
+                    <span class="sm:hidden text-xs text-slate-400 block">T: {{ Number(piece.peso_teorico).toFixed(1) }}</span>
+                  </template>
+                  <span v-else class="muted">—</span>
                 </td>
-                <td :class="diffClass(piece)" class="hidden sm:table-cell font-semibold font-mono">{{ pieceDiff(piece) }} kg</td>
+                <td :class="diffClass(piece)" class="hidden sm:table-cell font-semibold font-mono">
+                  {{ pieceDiff(piece) }}<template v-if="piece.peso_real"> kg</template>
+                </td>
                 <td>
                   <span
                     class="status transition-all duration-300 group-hover:scale-110 group-hover:shadow-sm text-[10px] sm:text-[11px]"
@@ -375,7 +385,8 @@ onMounted(async () => {
           </div>
 
           <div class="space-y-5">
-            <div class="grid grid-cols-2 gap-4">
+            <!-- Solo en creación: selector de proyecto y bloque -->
+            <div v-if="!form.id" class="grid grid-cols-2 gap-4">
               <label class="field">
                 <span class="flex items-center gap-1">
                   Proyecto
@@ -405,26 +416,33 @@ onMounted(async () => {
               <input v-model.trim="form.codigo" type="text" placeholder="Ej: P1A" class="transition-all focus:ring-2 focus:ring-brand-500/20" />
             </label>
 
-            <div class="grid grid-cols-2 gap-4">
-              <label class="field">
-                <span class="flex items-center gap-1">
-                  Peso teórico (kg)
-                  <span class="text-brand-500">*</span>
-                </span>
-                <input v-model.number="form.peso_teorico" type="number" step="0.001" min="0" placeholder="0.000" class="font-mono transition-all focus:ring-2 focus:ring-brand-500/20" />
-                <small v-if="errors.peso_teorico" class="field-error animate-pulse">{{ errors.peso_teorico }}</small>
-              </label>
-              <label class="field">
-                <span class="flex items-center gap-1">
-                  Peso real (kg)
-                  <span class="text-brand-500">*</span>
-                </span>
-                <input v-model.number="form.peso_real" type="number" step="0.001" min="0" placeholder="0.000" class="font-mono transition-all focus:ring-2 focus:ring-brand-500/20" />
-                <small v-if="errors.peso_real" class="field-error animate-pulse">{{ errors.peso_real }}</small>
-              </label>
-            </div>
+            <!-- Peso teórico: editable en creación, solo lectura en edición -->
+            <label class="field">
+              <span class="flex items-center gap-1">
+                Peso teórico (kg)
+                <span v-if="!form.id" class="text-brand-500">*</span>
+              </span>
+              <input
+                v-model.number="form.peso_teorico"
+                type="number" step="0.001" min="0" placeholder="0.000"
+                :readonly="!!form.id"
+                :class="['font-mono transition-all focus:ring-2 focus:ring-brand-500/20', { 'opacity-60 cursor-not-allowed bg-slate-50': !!form.id }]"
+              />
+              <small v-if="errors.peso_teorico" class="field-error animate-pulse">{{ errors.peso_teorico }}</small>
+            </label>
 
-            <div class="weight-diff bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200">
+            <!-- Solo en edición: peso real -->
+            <label v-if="form.id" class="field">
+              <span class="flex items-center gap-1">
+                Peso real (kg)
+                <span v-if="form.estado === 'fabricada'" class="text-brand-500">*</span>
+              </span>
+              <input v-model.number="form.peso_real" type="number" step="0.001" min="0" placeholder="0.000" class="font-mono transition-all focus:ring-2 focus:ring-brand-500/20" />
+              <small v-if="errors.peso_real" class="field-error animate-pulse">{{ errors.peso_real }}</small>
+            </label>
+
+            <!-- Diferencia calculada: solo en edición -->
+            <div v-if="form.id" class="weight-diff bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200">
               <span class="text-[13px] text-slate-500 flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
@@ -434,7 +452,8 @@ onMounted(async () => {
               <strong :class="[weightDiffClass, 'font-mono text-lg']">{{ weightDiff }} kg</strong>
             </div>
 
-            <label class="field">
+            <!-- Estado: solo en edición -->
+            <label v-if="form.id" class="field">
               <span class="flex items-center gap-1">
                 Estado
                 <span class="text-brand-500">*</span>
