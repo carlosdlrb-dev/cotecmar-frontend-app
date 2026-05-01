@@ -9,6 +9,9 @@ const route = useRoute()
 const uiStore = useUiStore()
 const confirmModal = useConfirmationModal()
 
+const formatPeso = (value) =>
+  Number(value).toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 3 })
+
 const loading = ref(true)
 const pieces = ref([])
 const projects = ref([])
@@ -37,7 +40,7 @@ const weightDiff = computed(() => {
   const r = Number(form.peso_real)
   if (!form.peso_teorico || !form.peso_real) return '—'
   const diff = r - t
-  return (diff >= 0 ? '+' : '') + diff.toFixed(3)
+  return (diff >= 0 ? '+' : '') + formatPeso(diff)
 })
 const weightDiffClass = computed(() => {
   const d = Number(form.peso_real) - Number(form.peso_teorico)
@@ -112,9 +115,7 @@ const savePiece = async () => {
   let valid = true
   if (!form.bloque_id && !form.id)    { errors.bloque_id = 'Selecciona un bloque.'; valid = false }
   if (!form.peso_teorico && !form.id) { errors.peso_teorico = 'Peso teórico obligatorio.'; valid = false }
-  if (form.id && form.estado === 'fabricada' && !form.peso_real) {
-    errors.peso_real = 'Peso real obligatorio para marcar como fabricada.'; valid = false
-  }
+
   if (!valid) return
 
   submitting.value = true
@@ -123,7 +124,6 @@ const savePiece = async () => {
       const payload = {
         codigo:    form.codigo || null,
         peso_real: form.peso_real !== '' ? Number(form.peso_real) : null,
-        estado:    form.estado,
       }
       await piecesApi.patch(`/piezas/${form.id}`, payload)
       uiStore.showToast({ type: 'success', title: 'Pieza actualizada', message: 'Los cambios se guardaron.' })
@@ -167,10 +167,63 @@ const deletePiece = (p) => {
   })
 }
 
+// Fabricar pieza
+const showFabricarModal = ref(false)
+const fabricarPieceId = ref(null)
+const fabricarPieceLabel = ref('')
+const fabricarPesoReal = ref('')
+const fabricarPesoTeorico = ref(0)
+const fabricarSubmitting = ref(false)
+const fabricarError = ref('')
+
+const fabricarDiff = computed(() => {
+  if (fabricarPesoReal.value === '' || fabricarPesoReal.value === null) return null
+  const d = Number(fabricarPesoReal.value) - Number(fabricarPesoTeorico.value)
+  return d
+})
+const fabricarDiffLabel = computed(() => {
+  if (fabricarDiff.value === null) return null
+  return (fabricarDiff.value >= 0 ? '+' : '') + formatPeso(fabricarDiff.value)
+})
+const fabricarDiffClass = computed(() => {
+  if (fabricarDiff.value === null) return ''
+  return fabricarDiff.value > 0 ? 'text-warning' : fabricarDiff.value < 0 ? 'text-danger' : 'text-success'
+})
+
+const openFabricar = (p) => {
+  fabricarPieceId.value = p.id
+  fabricarPieceLabel.value = p.codigo ? `"${p.codigo}"` : `pieza #${p.id}`
+  fabricarPesoTeorico.value = p.peso_teorico
+  fabricarPesoReal.value = ''
+  fabricarError.value = ''
+  showFabricarModal.value = true
+}
+
+const submitFabricar = async () => {
+  fabricarError.value = ''
+  if (fabricarPesoReal.value === '' || fabricarPesoReal.value === null) {
+    fabricarError.value = 'El peso real es obligatorio.'
+    return
+  }
+  fabricarSubmitting.value = true
+  try {
+    await piecesApi.put(`/piezas/${fabricarPieceId.value}/fabricar`, {
+      peso_real: Number(fabricarPesoReal.value),
+    })
+    uiStore.showToast({ type: 'success', title: 'Pieza fabricada', message: `La ${fabricarPieceLabel.value} fue marcada como fabricada.` })
+    showFabricarModal.value = false
+    await fetchPieces(pagination.currentPage)
+  } catch (err) {
+    fabricarError.value = err?.response?.data?.message || 'No se pudo fabricar la pieza.'
+  } finally {
+    fabricarSubmitting.value = false
+  }
+}
+
 const pieceDiff = (p) => {
   if (!p.peso_real) return '—'
   const d = Number(p.peso_real) - Number(p.peso_teorico)
-  return (d >= 0 ? '+' : '') + d.toFixed(3)
+  return (d >= 0 ? '+' : '') + formatPeso(d)
 }
 const diffClass = (p) => {
   if (!p.peso_real) return 'text-slate-400'
@@ -288,7 +341,7 @@ onMounted(async () => {
                 <th>Peso real</th>
                 <th class="hidden sm:table-cell">Diferencia</th>
                 <th>Estado</th>
-                <th style="width:160px; min-width:160px;">Acciones</th>
+                <th style="width:210px; min-width:210px;">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -307,11 +360,11 @@ onMounted(async () => {
                 </td>
                 <td class="hidden lg:table-cell group-hover:text-brand-700 transition-colors">{{ piece.bloque?.proyecto?.nombre || piece.proyecto?.nombre || '—' }}</td>
                 <td class="hidden md:table-cell">{{ piece.bloque?.nombre || '—' }}</td>
-                <td class="hidden sm:table-cell font-mono">{{ Number(piece.peso_teorico).toFixed(3) }} kg</td>
+                <td class="hidden sm:table-cell font-mono">{{ formatPeso(piece.peso_teorico) }} kg</td>
                 <td class="font-mono">
                   <template v-if="piece.peso_real">
-                    {{ Number(piece.peso_real).toFixed(3) }} kg
-                    <span class="sm:hidden text-xs text-slate-400 block">T: {{ Number(piece.peso_teorico).toFixed(1) }}</span>
+                    {{ formatPeso(piece.peso_real) }} kg
+                    <span class="sm:hidden text-xs text-slate-400 block">T: {{ formatPeso(piece.peso_teorico) }}</span>
                   </template>
                   <span v-else class="muted">—</span>
                 </td>
@@ -328,6 +381,16 @@ onMounted(async () => {
                 </td>
                 <td>
                   <div class="table-actions opacity-70 group-hover:opacity-100 transition-opacity">
+                    <button
+                      v-if="piece.estado === 'pendiente'"
+                      class="fabricar-button magnetic-hover text-xs sm:text-[13px] px-2 sm:px-3 py-1.5 sm:py-[7px]"
+                      @click="openFabricar(piece)"
+                    >
+                      <svg class="w-3.5 h-3.5 sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                      </svg>
+                      <span class="hidden sm:inline">Fabricar</span>
+                    </button>
                     <button
                       class="ghost-button magnetic-hover text-xs sm:text-[13px] px-2 sm:px-3 py-1.5 sm:py-[7px]"
                       @click="openEdit(piece)"
@@ -435,7 +498,6 @@ onMounted(async () => {
             <label v-if="form.id" class="field">
               <span class="flex items-center gap-1">
                 Peso real (kg)
-                <span v-if="form.estado === 'fabricada'" class="text-brand-500">*</span>
               </span>
               <input v-model.number="form.peso_real" type="number" step="0.001" min="0" placeholder="0.000" class="font-mono transition-all focus:ring-2 focus:ring-brand-500/20" />
               <small v-if="errors.peso_real" class="field-error animate-pulse">{{ errors.peso_real }}</small>
@@ -451,18 +513,6 @@ onMounted(async () => {
               </span>
               <strong :class="[weightDiffClass, 'font-mono text-lg']">{{ weightDiff }} kg</strong>
             </div>
-
-            <!-- Estado: solo en edición -->
-            <label v-if="form.id" class="field">
-              <span class="flex items-center gap-1">
-                Estado
-                <span class="text-brand-500">*</span>
-              </span>
-              <select v-model="form.estado" class="transition-all focus:ring-2 focus:ring-brand-500/20">
-                <option value="pendiente">🟡 Pendiente</option>
-                <option value="fabricada">🟢 Fabricada</option>
-              </select>
-            </label>
 
             <Transition name="form-error">
               <div v-if="errors.general" class="form-error flex items-center gap-2">
@@ -488,6 +538,88 @@ onMounted(async () => {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                 </svg>
                 {{ form.id ? 'Actualizar' : 'Guardar' }}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+    </Teleport>
+
+    <!-- Modal: Fabricar pieza -->
+    <Teleport to="body">
+    <Transition name="modal">
+      <div v-if="showFabricarModal" class="modal-backdrop" @click.self="showFabricarModal = false">
+        <div class="modal relative overflow-hidden" style="max-width:440px;">
+          <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600"></div>
+
+          <div class="flex items-center gap-3 mb-6">
+            <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              </svg>
+            </div>
+            <div>
+              <h2 class="text-xl font-black text-slate-900">Fabricar pieza</h2>
+              <p class="text-sm text-slate-500 mt-0.5">{{ fabricarPieceLabel }}</p>
+            </div>
+          </div>
+
+          <div class="space-y-5">
+            <label class="field">
+              <span class="flex items-center gap-1">
+                Peso real (kg)
+                <span class="text-amber-500">*</span>
+              </span>
+              <input
+                v-model.number="fabricarPesoReal"
+                type="number" step="0.001" min="0" placeholder="0.000"
+                class="font-mono transition-all focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                @keydown.enter="submitFabricar"
+              />
+            </label>
+
+            <Transition name="form-error">
+              <div v-if="fabricarDiffLabel !== null" class="weight-diff bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200">
+                <span class="text-[13px] text-slate-500 flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                  </svg>
+                  Diferencia (real − teórico)
+                </span>
+                <strong :class="[fabricarDiffClass, 'font-mono text-lg']">{{ fabricarDiffLabel }} kg</strong>
+              </div>
+            </Transition>
+
+            <Transition name="form-error">
+              <div v-if="fabricarError" class="form-error flex items-center gap-2">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                {{ fabricarError }}
+              </div>
+            </Transition>
+          </div>
+
+          <div class="modal-actions pt-4 border-t border-slate-100 mt-6">
+            <button class="ghost-button magnetic-hover" @click="showFabricarModal = false">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+              Cancelar
+            </button>
+            <button
+              class="fabricar-button magnetic-hover"
+              style="background-color:#d97706;color:#fff;border-color:#d97706;"
+              :disabled="fabricarSubmitting"
+              @click="submitFabricar"
+            >
+              <span v-if="fabricarSubmitting" class="spinner relative z-10"></span>
+              <span v-else class="relative z-10 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                Confirmar fabricación
               </span>
             </button>
           </div>

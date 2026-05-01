@@ -275,6 +275,13 @@
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/25 focus-visible:ring-offset-2;
     @apply disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0;
   }
+  .fabricar-button {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full;
+    @apply bg-amber-50 text-amber-700 border border-amber-200 font-semibold text-sm;
+    @apply transition-all duration-150 hover:bg-amber-100 hover:-translate-y-0.5;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/25 focus-visible:ring-offset-2;
+    @apply disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0;
+  }
   .link { @apply text-brand-700 hover:text-brand-800 font-bold transition-colors; }
 
   /* ── Form fields ────────────────────────────────── */
